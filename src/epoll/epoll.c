@@ -11,17 +11,9 @@
 #include "epoll.h"
     #include <stdio.h>
 
-char* epoll_buffer_alloc();
+static int basefd = 0;
 
 void epoll_run() {
-    int basefd = epoll_init();
-
-    if (basefd == -1) return;
-
-    char* buffer = epoll_buffer_alloc();
-
-    if (buffer == NULL) return;
-
     epoll_event_t events[EPOLL_MAX_EVENTS];
 
     while(1) {
@@ -37,14 +29,12 @@ void epoll_run() {
                 continue;
             }
 
-            int* p_int = (int*)ev->data.ptr;
-
             connection_t* connection = (connection_t*)ev->data.ptr;
 
             int r = connection_trylock(connection);
 
             if (r != 0) {
-                printf("try %d, %d\n", r, gettid());
+                // printf("try %d, %d\n", r, gettid());
                 continue;
             }
 
@@ -54,7 +44,7 @@ void epoll_run() {
                 connection->close(connection);
             }
             else if (ev->events & EPOLLIN) {
-                connection->read(connection, buffer, EPOLL_BUFFER);
+                connection->read(connection);
             }
             else if (ev->events & EPOLLOUT) {
                 connection->write(connection);
@@ -66,11 +56,11 @@ void epoll_run() {
 
     socket_free();
 
-    close(basefd);
+    epoll_close();
 }
 
 int epoll_init() {
-    int basefd = epoll_create1(0);
+    basefd = epoll_create1(0);
 
     if (basefd == -1) {
         log_error("Epoll error: Epoll create1 failed\n");
@@ -83,7 +73,7 @@ int epoll_init() {
         if (socket == NULL) return -1;
 
         socket->event->data.fd = socket->base.fd;
-        socket->event->events = EPOLLIN;
+        socket->event->events = EPOLLIN | EPOLLET | EPOLLEXCLUSIVE;
 
         if (epoll_ctl(basefd, EPOLL_CTL_ADD, socket->base.fd, socket->event) == -1) {
             log_error("Epoll error: Epoll_ctl failed in addListener\n");
@@ -94,8 +84,8 @@ int epoll_init() {
     return basefd;
 }
 
-char* epoll_buffer_alloc() {
-    return (char*)malloc(EPOLL_BUFFER);
+int epoll_close() {
+    return close(basefd);
 }
 
 int epoll_after_create_connection(connection_t* connection) {
@@ -110,7 +100,7 @@ int epoll_after_create_connection(connection_t* connection) {
     connection->after_read_request = epoll_after_read_request;
     connection->after_write_request = epoll_after_write_request;
 
-    if (epoll_control_add(connection, EPOLLIN) == -1) {
+    if (epoll_control_add(connection, EPOLLIN | EPOLLET) == -1) {
         log_error("Epoll error: Error epoll_ctl failed accept\n");
         return -1;
     }
@@ -131,7 +121,7 @@ socket_epoll_t* epoll_socket_alloc() {
 }
 
 int epoll_after_read_request(connection_t* connection) {
-    if (epoll_control_mod(connection, EPOLLOUT) == -1) {
+    if (epoll_control_mod(connection, EPOLLOUT | EPOLLET) == -1) {
         log_error("Epoll error: Epoll_ctl failed in read done, %d, %d\n", gettid(), errno);
         return -1;
     }
@@ -143,7 +133,7 @@ int epoll_after_write_request(connection_t* connection) {
     if (connection->keepalive_enabled == 0) {
         connection->close(connection);
     } else {
-        if (epoll_control_mod(connection, EPOLLIN) == -1) {
+        if (epoll_control_mod(connection, EPOLLIN | EPOLLET) == -1) {
             log_error("Epoll error: Epoll_ctl failed in write done, %d, %d\n", gettid(), errno);
             return -1;
         }

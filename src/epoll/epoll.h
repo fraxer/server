@@ -7,8 +7,6 @@
 
 #define EPOLL_MAX_EVENTS 16
 
-#define EPOLL_BUFFER 16384
-
 typedef struct epoll_event epoll_event_t;
 
 typedef struct socket_epoll {
@@ -19,6 +17,8 @@ typedef struct socket_epoll {
 void epoll_run();
 
 int epoll_init();
+
+int epoll_close();
 
 int epoll_after_create_connection(connection_t*);
 

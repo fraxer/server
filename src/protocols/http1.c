@@ -8,12 +8,22 @@
 #include "http1.h"
     #include <stdio.h>
 
+static char* http1_buffer = NULL;
+
 int SSL_read(void*, const void*, int);
 int SSL_write(void*, const void*, int);
 
-void http1_read(connection_t* connection, char* buffer, size_t size) {
+int http1_init() {
+    http1_buffer = (char*)malloc(HTTP1_BUFFER);
+
+    if (http1_buffer == NULL) return -1;
+
+    return 0;
+}
+
+void http1_read(connection_t* connection) {
     while (1) {
-        int readed = http1_read_internal(connection, buffer, size);
+        int readed = http1_read_internal(connection, http1_buffer);
 
         if (readed == -1) {
             connection->after_read_request(connection);
@@ -36,10 +46,10 @@ void http1_write(connection_t* connection) {
     connection->after_write_request(connection);
 }
 
-ssize_t http1_read_internal(connection_t* connection, char* buffer, size_t size) {
+ssize_t http1_read_internal(connection_t* connection, char* buf) {
     return connection->ssl_enabled ?
-        SSL_read(connection->ssl, buffer, size) :
-        read(connection->fd, buffer, size);
+        SSL_read(connection->ssl, buf, HTTP1_BUFFER) :
+        read(connection->fd, buf, HTTP1_BUFFER);
 }
 
 ssize_t http1_write_internal(connection_t* connection, const char* response, size_t size) {

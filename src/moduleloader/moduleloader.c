@@ -10,6 +10,7 @@
 #include "../route/routeloader.h"
 #include "../domain/domain.h"
 #include "../server/server.h"
+#include "../epoll/epoll.h"
 // #include "../database/database.h"
 // #include "../openssl/openssl.h"
 // #include "../mimetype/mimetype.h"
@@ -344,6 +345,19 @@ int module_loader_load_threads(void* moduleStruct) {
         return -1;
     }
 
+    // if (fd_handler == THREAD_EPOLL) {
+        if (epoll_init() == -1) return -1;
+    // }
+    // if (fd_handler == THREAD_SELECT) {
+    //     select_init();
+    // }
+    // if (fd_handler == THREAD_POLL) {
+    //     poll_init();
+    // }
+    // if (fd_handler == THREAD_KQUEUE) {
+    //     kqueue_init();
+    // }
+
     pthread_t thread_workers[workers];
 
     for(int i = 0; i < workers; i++) {
@@ -385,6 +399,8 @@ int module_loader_load_threads(void* moduleStruct) {
     for (int i = 0; i < handlers; i++) {
         pthread_join(thread_handlers[i], NULL);
     }
+
+    epoll_close();
 
     return 0;
 }

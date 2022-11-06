@@ -14,7 +14,7 @@ typedef struct connection {
     pthread_mutex_t mutex;
 
     int(*close)(struct connection*);
-    void(*read)(struct connection*, char*, size_t);
+    void(*read)(struct connection*);
     void(*write)(struct connection*);
     int(*after_read_request)(struct connection*);
     int(*after_write_request)(struct connection*);
